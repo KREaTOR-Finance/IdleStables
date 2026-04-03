@@ -182,7 +182,10 @@ pub mod idlestables {
 
     /// Resolve race: deterministic placeholder (no VRF yet).
     /// Provide remaining accounts containing Horse accounts (in any order).
-    pub fn resolve_race(ctx: Context<ResolveRace>, _args: ResolveRaceArgs) -> Result<()> {
+    pub fn resolve_race<'a>(
+        ctx: Context<'a, ResolveRace<'a>>,
+        _args: ResolveRaceArgs,
+    ) -> Result<()> {
         let clock = Clock::get()?;
         let track = &ctx.accounts.track;
         let race = &mut ctx.accounts.race;
