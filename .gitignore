@@ -1,0 +1,18 @@
+# General
+.DS_Store
+*.log
+
+# Node
+node_modules/
+
+# Android / Gradle
+.gradle/
+build/
+*.iml
+.idea/
+
+# Rust
+target/
+
+# Env
+.env
