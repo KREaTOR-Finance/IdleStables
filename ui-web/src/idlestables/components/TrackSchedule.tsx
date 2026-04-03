@@ -5,7 +5,7 @@ function fmtTime(tsSec: number) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function TrackSchedule({ track, races }: { track: Track; races: RaceSlot[] }) {
+export function TrackSchedule({ track, races, onEnter }: { track: Track; races: RaceSlot[]; onEnter?: (race: RaceSlot) => void }) {
   return (
     <div
       style={{
@@ -46,11 +46,12 @@ export function TrackSchedule({ track, races }: { track: Track; races: RaceSlot[
             <button
               type="button"
               disabled={r.status !== 'OPEN'}
+              onClick={() => onEnter?.(r)}
               style={{
                 borderRadius: 12,
                 padding: '10px 12px',
                 border: 'none',
-                background: r.status === 'OPEN' ? '#154212' : 'rgba(0,0,0,0.15)',
+                background: r.isMegaCup ? '#8B6B1F' : r.status === 'OPEN' ? '#154212' : 'rgba(0,0,0,0.15)',
                 color: 'white',
                 fontWeight: 800,
                 cursor: r.status === 'OPEN' ? 'pointer' : 'not-allowed',

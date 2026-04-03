@@ -10,13 +10,14 @@ npm install
 npm run dev
 ```
 
-## Screens to build first (MVP)
-- DashboardResultsFeed
-- MyStableGrid
-- TrackSchedule (races at :00 / :30; closes 60s prior)
-- EnterRaceSheet
-- RaceResultPhotoFinish
-- SilksEditor
+## Pages (MVP UI spec)
+- /dashboard
+- /stable
+- /tracks
+- /tracks/:id
+- /race/:id
+- /breed
+- /silks
 
 ## Data model (front-end)
 The app will render horses from deterministic metadata:
