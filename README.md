@@ -22,5 +22,36 @@ See:
 - Schedule: resolves at **:00 and :30**, closes **T-60s**
 - Field size: **12** (Mega Cup **18** once per track race day)
 
+## Run (dev)
+
+### UI spec (web)
+```bash
+cd ui-web
+npm install
+npm run dev
+```
+
+### Steward (Railway/local)
+```bash
+cd steward
+npm install
+cp .env.example .env
+npm run dev
+```
+
+### Solana program (local build)
+```bash
+cd solana
+cargo fmt
+cargo build
+```
+
+**Windows note:** if `cargo build` fails with `Access is denied (os error 5)` while linking/copying build scripts, it’s typically antivirus/locking on `.exe` in the target dir. Workarounds:
+- add an AV exclusion for the repo/target dir
+- build from WSL2
+- or set `CARGO_TARGET_DIR` to a different path and retry
+
 ## Next
-Start with `solana/programs/idlestables` and implement the account model + instructions skeleton.
+- Wire SPL token accounts + real fee transfers
+- Add steward Anchor client integration
+- Add Android app scaffold
