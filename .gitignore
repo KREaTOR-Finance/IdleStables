@@ -10,6 +10,7 @@ node_modules/
 build/
 *.iml
 .idea/
+**/local.properties
 
 # Rust
 target/
