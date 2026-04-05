@@ -8,8 +8,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.idlestables.app.idlestables.demo.DemoRepository
-import com.idlestables.app.idlestables.model.Horse
+import com.idlestables.core.demo.DemoRepository
+import com.idlestables.core.model.Horse
 
 @Composable
 fun StableScreen(repo: DemoRepository) {

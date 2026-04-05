@@ -1,6 +1,6 @@
-package com.idlestables.app.idlestables.demo
+package com.idlestables.core.demo
 
-import com.idlestables.app.idlestables.model.*
+import com.idlestables.core.model.*
 import kotlin.math.absoluteValue
 
 object DemoData {
@@ -62,7 +62,7 @@ object DemoData {
     )
 
     /**
-     * Demo schedule rules (updated):
+     * Demo schedule rules:
      * - Generate the next [slotsAhead] races aligned to cadence.
      * - "Mega Cup" shows **exactly once per track race day**.
      *   In this demo we define race day as UTC day (00:00..23:59 UTC) for determinism.

@@ -1,9 +1,8 @@
-package com.idlestables.app.idlestables.demo
+package com.idlestables.core.demo
 
-import com.idlestables.app.idlestables.model.*
+import com.idlestables.core.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.update
 import kotlin.math.floor
 
 /**
@@ -65,7 +64,6 @@ class DemoRepository {
     }
 
     fun enterRace(trackId: String, raceId: String, horseId: String, mode: EnterRaceMode): Boolean {
-        // demo: increment entrantsCount in slot
         val current = _state.value
         val trackRaces = current.racesByTrack[trackId].orEmpty()
         val slot = trackRaces.find { it.id == raceId } ?: return false
@@ -73,7 +71,6 @@ class DemoRepository {
 
         val updatedSlot = slot.copy(entrantsCount = minOf(slot.fieldSize, slot.entrantsCount + 1))
 
-        // write back into store/state
         DemoStore.setRaceSlot(trackId, raceId) { updatedSlot }
         syncFromStore()
 

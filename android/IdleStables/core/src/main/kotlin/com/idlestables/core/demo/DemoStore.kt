@@ -1,6 +1,6 @@
-package com.idlestables.app.idlestables.demo
+package com.idlestables.core.demo
 
-import com.idlestables.app.idlestables.model.*
+import com.idlestables.core.model.*
 
 object DemoStore {
 
@@ -39,6 +39,16 @@ object DemoStore {
     var state: State = State()
         private set
 
+    fun ensureRacesUpToDate(nowSec: Long = nowSec()) {
+        val dayStart = dayStartSec(nowSec)
+        if (state.racesGeneratedDayStartSec != dayStart) {
+            state = state.copy(
+                racesByTrack = DemoData.makeDemoRaces(nowSec = nowSec),
+                racesGeneratedDayStartSec = dayStart,
+            )
+        }
+    }
+
     fun setRacesForTrack(trackId: String, races: List<RaceSlot>) {
         val m = state.racesByTrack.toMutableMap()
         m[trackId] = races
@@ -49,17 +59,6 @@ object DemoStore {
         val races = state.racesByTrack[trackId].orEmpty()
         val next = races.map { if (it.id == raceId) update(it) else it }
         setRacesForTrack(trackId, next)
-    }
-
-    fun ensureRacesUpToDate(nowSec: Long = nowSec()) {
-        val dayStart = dayStartSec(nowSec)
-        if (state.racesGeneratedDayStartSec != dayStart) {
-            // New race day: regenerate schedule.
-            state = state.copy(
-                racesByTrack = DemoData.makeDemoRaces(nowSec = nowSec),
-                racesGeneratedDayStartSec = dayStart,
-            )
-        }
     }
 
     fun updateSilks(profile: SilksProfile) {

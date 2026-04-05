@@ -1,17 +1,19 @@
-package com.idlestables.app.idlestables.model
+package com.idlestables.core.model
 
-import kotlin.math.floor
+import kotlinx.serialization.Serializable
 
 enum class HorseTier { YEARLING, GRADED, LEGENDARY }
 
 enum class SilksPattern { SOLID, QUARTERS, DIAGONAL }
 
+@Serializable
 data class SilksProfile(
     val pattern: SilksPattern,
     val primaryColor: String,
     val secondaryColor: String? = null,
 )
 
+@Serializable
 data class HorseLayers(
     val poseId: Int,
     val coatId: Int,
@@ -20,6 +22,7 @@ data class HorseLayers(
     val backgroundId: Int,
 )
 
+@Serializable
 data class Horse(
     val id: String,
     val name: String,
@@ -37,6 +40,7 @@ data class Horse(
     val yieldDecayBps: Int,
 )
 
+@Serializable
 data class Track(
     val id: String,
     val name: String,
@@ -47,6 +51,7 @@ data class Track(
 
 enum class RaceStatus { OPEN, LOCKED, RUNNING, FINISHED }
 
+@Serializable
 data class RaceSlot(
     val id: String,
     val trackId: String,
@@ -59,8 +64,10 @@ data class RaceSlot(
     val entryFeeMultiplier: Int,
 )
 
+@Serializable
 data class PodiumPlace(val position: Int, val horseId: String)
 
+@Serializable
 data class RaceResult(
     val raceId: String,
     val trackId: String,

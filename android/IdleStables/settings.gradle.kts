@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "IdleStables"
 include(":app")
+include(":core")
+include(":server")

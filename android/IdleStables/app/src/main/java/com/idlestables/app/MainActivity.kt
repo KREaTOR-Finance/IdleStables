@@ -9,7 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
-import com.idlestables.app.idlestables.demo.DemoRepository
+import com.idlestables.core.demo.DemoRepository
 import com.idlestables.app.idlestables.ui.IdleStablesApp
 import com.solana.mobilewalletadapter.clientlib.ActivityResultSender
 import com.solana.mobilewalletadapter.clientlib.ConnectionIdentity
