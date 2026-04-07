@@ -63,7 +63,9 @@ class SolanaRpc(
             setBody(req)
         }.bodyAsText()
 
-        val resp = json.decodeFromString<RpcResponse>(text)
+        val resp = runCatching { json.decodeFromString<RpcResponse>(text) }.getOrElse { e ->
+            throw RpcException("RPC decode failed: ${e.message}; body=${text.take(300)}")
+        }
 
         if (resp.error != null) {
             throw RpcException("RPC error ${resp.error.code}: ${resp.error.message}")

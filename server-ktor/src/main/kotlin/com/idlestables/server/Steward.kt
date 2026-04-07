@@ -43,12 +43,11 @@ class RaceSteward(
             return
         }
 
-        // MVP: sanity check RPC.
-        val ok = rpc.getHealth()
-        if (!ok) {
-            log.warn("RPC health check failed")
-            return
-        }
+        // MVP: sanity check RPC (log the underlying cause if it fails)
+        val health = runCatching { rpc.call("getHealth") }
+            .onFailure { log.warn("RPC health check failed", it) }
+
+        if (health.isFailure) return
 
         // Step 1: prove we can sign + send a tx from Railway (noop self-transfer) once.
         if (cfg.stewardKeypairJsonBase64Set && !didNoopTx) {
