@@ -7,10 +7,10 @@ import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.delay
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Duration
@@ -55,10 +55,15 @@ class SolanaRpc(
 
     private suspend fun callOnce(url: String, method: String, params: JsonArray): JsonElement {
         val req = RpcRequest(method = method, params = params)
-        val resp: RpcResponse = http.post(url) {
+
+        // Don't rely on response Content-Type for conversion (some RPC providers omit/mangle it).
+        val text = http.post(url) {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(req)
-        }.body()
+        }.bodyAsText()
+
+        val resp = json.decodeFromString<RpcResponse>(text)
 
         if (resp.error != null) {
             throw RpcException("RPC error ${resp.error.code}: ${resp.error.message}")
