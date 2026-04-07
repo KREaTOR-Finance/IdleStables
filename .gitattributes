@@ -1,0 +1,6 @@
+# Prevent Windows line endings from breaking Linux scripts in Docker/Railway
+* text=auto
+
+server-ktor/gradlew text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf

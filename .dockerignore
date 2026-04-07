@@ -1,0 +1,16 @@
+.git
+.gitignore
+.idea
+**/.DS_Store
+
+# Not needed for building Ktor backend image
+android/
+ui-web/
+steward/
+skills/
+solana/
+
+# Common big dirs
+**/node_modules/
+**/build/
+**/out/
