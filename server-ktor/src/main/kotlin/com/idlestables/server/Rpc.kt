@@ -1,18 +1,16 @@
 package com.idlestables.server
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -27,19 +25,9 @@ class SolanaRpc(
         explicitNulls = false
     }
 
-    private val http = HttpClient(CIO) {
-        install(ContentNegotiation) { json(this@SolanaRpc.json) }
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.INFO
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = timeout.inWholeMilliseconds
-            connectTimeoutMillis = timeout.inWholeMilliseconds
-            socketTimeoutMillis = timeout.inWholeMilliseconds
-        }
-        expectSuccess = false
-    }
+    private val http: HttpClient = HttpClient.newBuilder()
+        .connectTimeout(java.time.Duration.ofMillis(timeout.inWholeMilliseconds))
+        .build()
 
     suspend fun call(method: String, params: JsonArray = buildJsonArray {}): JsonElement {
         // Try primary, then fallback once.
@@ -56,12 +44,29 @@ class SolanaRpc(
     private suspend fun callOnce(url: String, method: String, params: JsonArray): JsonElement {
         val req = RpcRequest(method = method, params = params)
 
-        // Don't rely on response Content-Type for conversion (some RPC providers omit/mangle it).
-        val text = http.post(url) {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            setBody(req)
-        }.bodyAsText()
+        val body = json.encodeToString(req)
+
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(java.time.Duration.ofMillis(timeout.inWholeMilliseconds))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+            .build()
+
+        val text = withContext(Dispatchers.IO) {
+            val response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+            val status = response.statusCode()
+            val respBody = response.body() ?: ""
+            if (status !in 200..299) {
+                throw RpcException("RPC HTTP $status; body=${respBody.take(300)}")
+            }
+            respBody
+        }
+
+        if (text.isBlank()) {
+            throw RpcException("RPC empty response body")
+        }
 
         val resp = runCatching { json.decodeFromString<RpcResponse>(text) }.getOrElse { e ->
             throw RpcException("RPC decode failed: ${e.message}; body=${text.take(300)}")
