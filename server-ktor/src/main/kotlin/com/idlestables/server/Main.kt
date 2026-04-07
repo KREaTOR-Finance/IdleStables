@@ -48,9 +48,11 @@ fun Application.module() {
         }
 
         // MVP placeholders — will be backed by RPC + Supabase index.
-        get("/tracks") { call.respond(emptyList<Any>()) }
-        get("/track/{id}/races") { call.respond(emptyList<Any>()) }
-        get("/wallet/{pubkey}/horses") { call.respond(emptyList<Any>()) }
+        // IMPORTANT: respond with a statically-serializable type (not `emptyList<Any>()`),
+        // otherwise Ktor/Kotlinx may try to serialize the runtime `EmptyList` polymorphically.
+        get("/tracks") { call.respond(emptyList<TrackDto>()) }
+        get("/track/{id}/races") { call.respond(emptyList<RaceDto>()) }
+        get("/wallet/{pubkey}/horses") { call.respond(emptyList<HorseDto>()) }
     }
 }
 
@@ -62,4 +64,19 @@ data class HealthResponse(
     val programIdSet: Boolean,
     val supabaseConfigured: Boolean,
     val stewardKeyConfigured: Boolean,
+)
+
+@Serializable
+data class TrackDto(
+    val track_pubkey: String? = null,
+)
+
+@Serializable
+data class RaceDto(
+    val race_pubkey: String? = null,
+)
+
+@Serializable
+data class HorseDto(
+    val horse_pubkey: String? = null,
 )
