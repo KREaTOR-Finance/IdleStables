@@ -16,11 +16,13 @@ RUN ./gradlew --no-daemon installDist
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 
-COPY --from=build /app/server-ktor/build/install/server-ktor ./server-ktor
-WORKDIR /app/server-ktor
+# Note: settings.gradle.kts sets rootProject.name = "idlestables-server",
+# so installDist outputs build/install/idlestables-server
+COPY --from=build /app/server-ktor/build/install/idlestables-server ./idlestables-server
+WORKDIR /app/idlestables-server
 
 # Railway injects PORT, but we keep a default
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["./bin/server-ktor"]
+CMD ["./bin/idlestables-server"]
