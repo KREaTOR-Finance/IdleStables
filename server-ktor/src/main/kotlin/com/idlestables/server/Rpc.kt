@@ -26,6 +26,8 @@ class SolanaRpc(
     }
 
     private val http: HttpClient = HttpClient.newBuilder()
+        .version(HttpClient.Version.HTTP_1_1)
+        .followRedirects(HttpClient.Redirect.NORMAL)
         .connectTimeout(java.time.Duration.ofMillis(timeout.inWholeMilliseconds))
         .build()
 
@@ -51,21 +53,29 @@ class SolanaRpc(
             .timeout(java.time.Duration.ofMillis(timeout.inWholeMilliseconds))
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
+            .header("Accept-Encoding", "identity")
+            .header("User-Agent", "IdleStables/1.0")
             .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
             .build()
 
-        val text = withContext(Dispatchers.IO) {
+        val (status, headers, text) = withContext(Dispatchers.IO) {
             val response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-            val status = response.statusCode()
-            val respBody = response.body() ?: ""
-            if (status !in 200..299) {
-                throw RpcException("RPC HTTP $status; body=${respBody.take(300)}")
-            }
-            respBody
+            Triple(
+                response.statusCode(),
+                response.headers().map(),
+                response.body() ?: ""
+            )
+        }
+
+        if (status !in 200..299) {
+            throw RpcException("RPC HTTP $status; body=${text.take(300)}")
         }
 
         if (text.isBlank()) {
-            throw RpcException("RPC empty response body")
+            val host = runCatching { URI(url).host }.getOrNull() ?: "(unknown)"
+            val clen = headers["content-length"]?.firstOrNull()
+            val ctype = headers["content-type"]?.firstOrNull()
+            throw RpcException("RPC empty response body (host=$host, content-type=$ctype, content-length=$clen)")
         }
 
         val resp = runCatching { json.decodeFromString<RpcResponse>(text) }.getOrElse { e ->

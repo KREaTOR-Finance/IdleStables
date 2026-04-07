@@ -26,7 +26,7 @@ class RaceSteward(
                 try {
                     tick()
                 } catch (e: Exception) {
-                    log.warn("Steward tick failed: {}", e.message)
+                    log.warn("Steward tick failed", e)
                 }
                 delay(loopMs)
             }
