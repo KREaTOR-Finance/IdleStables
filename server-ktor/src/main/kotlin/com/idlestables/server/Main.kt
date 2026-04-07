@@ -11,6 +11,7 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.net.URI
 
 fun main() {
     embeddedServer(Netty, port = (System.getenv("PORT") ?: "8080").toInt(), host = "0.0.0.0") {
@@ -30,6 +31,23 @@ fun Application.module() {
         )
     }
 
+    fun redactUrl(url: String): String {
+        return runCatching {
+            val u = URI(url)
+            val base = buildString {
+                append(u.scheme)
+                append("://")
+                append(u.host ?: "")
+                if (u.port != -1) append(":").append(u.port)
+                if (!u.path.isNullOrBlank()) append(u.path)
+            }
+            if (u.query.isNullOrBlank()) base else "$base?REDACTED"
+        }.getOrElse {
+            // fallback: if it contains query params, redact them.
+            url.substringBefore('?') + if (url.contains('?')) "?REDACTED" else ""
+        }
+    }
+
     val cfg = AppConfig.fromEnv()
     val steward = installSteward(cfg)
 
@@ -38,7 +56,7 @@ fun Application.module() {
             call.respond(
                 HealthResponse(
                     ok = true,
-                    rpcPrimary = cfg.rpcUrlPrimary,
+                    rpcPrimary = redactUrl(cfg.rpcUrlPrimary),
                     rpcFallbackSet = (cfg.rpcUrlFallback != null),
                     programIdSet = cfg.programId.isNotBlank(),
                     supabaseConfigured = (cfg.supabaseUrl != null && cfg.supabaseServiceRoleKey != null),
