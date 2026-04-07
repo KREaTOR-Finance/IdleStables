@@ -1,0 +1,156 @@
+package com.idlestables.server
+
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.delay
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+
+class SolanaRpc(
+    private val primaryUrl: String,
+    private val fallbackUrl: String?,
+    private val timeout: Duration = 20.seconds,
+) {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+    }
+
+    private val http = HttpClient(CIO) {
+        install(ContentNegotiation) { json(this@SolanaRpc.json) }
+        install(Logging) {
+            logger = Logger.DEFAULT
+            level = LogLevel.INFO
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = timeout.inWholeMilliseconds
+            connectTimeoutMillis = timeout.inWholeMilliseconds
+            socketTimeoutMillis = timeout.inWholeMilliseconds
+        }
+        expectSuccess = false
+    }
+
+    suspend fun call(method: String, params: JsonArray = buildJsonArray {}): JsonElement {
+        // Try primary, then fallback once.
+        return try {
+            callOnce(primaryUrl, method, params)
+        } catch (e: Exception) {
+            if (fallbackUrl == null) throw e
+            // brief backoff
+            delay(250)
+            callOnce(fallbackUrl, method, params)
+        }
+    }
+
+    private suspend fun callOnce(url: String, method: String, params: JsonArray): JsonElement {
+        val req = RpcRequest(method = method, params = params)
+        val resp: RpcResponse = http.post(url) {
+            contentType(ContentType.Application.Json)
+            setBody(req)
+        }.body()
+
+        if (resp.error != null) {
+            throw RpcException("RPC error ${resp.error.code}: ${resp.error.message}")
+        }
+        return resp.result ?: JsonNull
+    }
+
+    suspend fun getHealth(): Boolean {
+        return runCatching {
+            call("getHealth")
+        }.isSuccess
+    }
+
+    suspend fun getLatestBlockhash(): String {
+        val res = call(
+            method = "getLatestBlockhash",
+            params = buildJsonArray {
+                add(buildJsonObject { put("commitment", "confirmed") })
+            }
+        )
+        // { context: {slot}, value: { blockhash, lastValidBlockHeight } }
+        return res.jsonObject["value"]!!.jsonObject["blockhash"]!!.jsonPrimitive.content
+    }
+
+    suspend fun getProgramAccounts(programId: String): ProgramAccountsResult {
+        val res = call(
+            method = "getProgramAccounts",
+            params = buildJsonArray {
+                add(programId)
+                add(
+                    buildJsonObject {
+                        put("encoding", "base64")
+                        put("commitment", "confirmed")
+                    }
+                )
+            }
+        )
+
+        // getProgramAccounts returns array; slot is not included, so we fetch slot separately.
+        val slotRes = call("getSlot", buildJsonArray { add(buildJsonObject { put("commitment", "confirmed") }) })
+        val slot = slotRes.jsonPrimitive.long
+
+        val accounts = res.jsonArray.map { el ->
+            val obj = el.jsonObject
+            val pubkey = obj["pubkey"]!!.jsonPrimitive.content
+            val acc = obj["account"]!!.jsonObject
+            val lamports = acc["lamports"]!!.jsonPrimitive.long
+            val owner = acc["owner"]!!.jsonPrimitive.content
+            val dataArr = acc["data"]!!.jsonArray
+            val dataB64 = dataArr[0].jsonPrimitive.content
+            ProgramAccount(pubkey, owner, lamports, dataB64)
+        }
+
+        return ProgramAccountsResult(slot = slot, accounts = accounts)
+    }
+}
+
+@Serializable
+data class ProgramAccountsResult(
+    val slot: Long,
+    val accounts: List<ProgramAccount>,
+)
+
+@Serializable
+data class ProgramAccount(
+    val pubkey: String,
+    val owner: String,
+    val lamports: Long,
+    val dataBase64: String,
+)
+
+class RpcException(message: String) : RuntimeException(message)
+
+@Serializable
+data class RpcRequest(
+    val jsonrpc: String = "2.0",
+    val id: Int = 1,
+    val method: String,
+    val params: JsonArray = buildJsonArray { },
+)
+
+@Serializable
+data class RpcResponse(
+    val jsonrpc: String? = null,
+    val id: Int? = null,
+    val result: JsonElement? = null,
+    val error: RpcError? = null,
+)
+
+@Serializable
+data class RpcError(
+    val code: Int,
+    val message: String,
+    val data: JsonElement? = null,
+)

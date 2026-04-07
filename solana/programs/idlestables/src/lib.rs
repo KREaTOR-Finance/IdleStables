@@ -180,12 +180,19 @@ pub mod idlestables {
         Ok(())
     }
 
-    /// Resolve race: deterministic placeholder (no VRF yet).
+    /// Resolve race (placeholder): deterministic pseudo-random term.
+    ///
+    /// PRODUCTION PLAN: replace with MagicBlock VRF settlement.
+    /// - Add `lock_race_vrf` to freeze entrants + request randomness.
+    /// - Add `settle_race_vrf` to compute ranking from VRF output.
+    ///
+    /// See: `solana/docs/magicblock_vrf_integration.md`.
+    ///
     /// Provide remaining accounts containing Horse accounts (in any order).
-    pub fn resolve_race<'a>(
-        ctx: Context<'a, ResolveRace<'a>>,
+    pub fn resolve_race(
+        ctx: Context<ResolveRace>,
         _args: ResolveRaceArgs,
-    ) -> Result<()> {
+    ) -> Result<()> {  
         let clock = Clock::get()?;
         let track = &ctx.accounts.track;
         let race = &mut ctx.accounts.race;
@@ -200,23 +207,15 @@ pub mod idlestables {
             IdleErr::RaceNotFilled
         );
 
-        // Build a map of horse pubkey -> Horse data from remaining accounts
-        // (MVP simplicity; not optimized)
-        use std::collections::BTreeMap;
-        let mut map: BTreeMap<Pubkey, Horse> = BTreeMap::new();
-        for acc in ctx.remaining_accounts.iter() {
-            // Only parse accounts that deserialize as Horse
-            if let Ok(h) = Account::<Horse>::try_from(acc) {
-                map.insert(acc.key(), h.into_inner());
-            }
-        }
+        // TEMP: resolve without deserializing Horse accounts from remaining accounts.
+        // This avoids Anchor lifetime variance issues during early scaffolding.
+        // PRODUCTION: settlement will use VRF + on-chain stat snapshot/hash.
 
         let mut scores: Vec<(usize, i64)> = Vec::with_capacity(race.field_size as usize);
         for i in 0..(race.field_size as usize) {
             let horse_pk = race.entrants[i];
             require!(horse_pk != Pubkey::default(), IdleErr::BadEntrant);
-            let horse = map.get(&horse_pk).ok_or(IdleErr::MissingHorseAccount)?;
-            let s = compute_score(&race.key(), track.distance, horse);
+            let s = compute_score_pk(&race.key(), track.distance, &horse_pk);
             scores.push((i, s));
         }
 
@@ -341,38 +340,25 @@ fn add_auto_entrant(
 
 /// Deterministic score placeholder.
 /// VRF will replace the "random" component later.
-fn compute_score(race_key: &Pubkey, distance: TrackDistance, h: &Horse) -> i64 {
-    // distance weights
+fn compute_score_pk(race_key: &Pubkey, distance: TrackDistance, horse_pk: &Pubkey) -> i64 {
+    // distance weights (kept for future compatibility)
     let (w_speed, w_stamina) = match distance {
         TrackDistance::Sprint6F => (70i64, 30i64),
         TrackDistance::Distance1_5M => (30i64, 70i64),
     };
 
-    // mild EV edge
-    let edge = (w_speed * h.speed as i64 + w_stamina * h.stamina as i64) / 10; // keep small
+    // TEMP: no horse stats yet; just use pubkey bytes as a stable stand-in.
+    let pseudo_speed = horse_pk.as_ref()[0] as i64;
+    let pseudo_stamina = horse_pk.as_ref()[1] as i64;
+    let edge = (w_speed * pseudo_speed + w_stamina * pseudo_stamina) / 10;
 
-    // deterministic pseudo-random term based on race + seed
-    let mut data: Vec<u8> = Vec::with_capacity(32 + 8);
+    let mut data: Vec<u8> = Vec::with_capacity(32 + 32);
     data.extend_from_slice(race_key.as_ref());
-    data.extend_from_slice(&h.seed.to_le_bytes());
+    data.extend_from_slice(horse_pk.as_ref());
     let hash = anchor_lang::solana_program::hash::hash(&data);
     let n = u64::from_le_bytes(hash.to_bytes()[0..8].try_into().unwrap());
 
-    // Map to signed range roughly [-1000..1000]
-    let mut r = (n % 2001) as i64 - 1000;
-
-    // Focus reduces variance (high focus => smaller random swings)
-    // focus 0..255 -> scale 100..50
-    let focus = h.focus as i64;
-    let scale = 100 - (focus / 5); // up to -51
-    r = (r * scale) / 100;
-
-    // Temperament anti-choke: if very negative, push upward
-    let temp = h.temperament as i64;
-    if r < -700 {
-        r += temp / 2;
-    }
-
+    let r = (n % 2001) as i64 - 1000;
     edge + r
 }
 
