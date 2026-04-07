@@ -33,14 +33,21 @@ class SolanaRpc(
 
     suspend fun call(method: String, params: JsonArray = buildJsonArray {}): JsonElement {
         // Try primary, then fallback once.
-        return try {
-            callOnce(primaryUrl, method, params)
-        } catch (e: Exception) {
-            if (fallbackUrl == null) throw e
-            // brief backoff
-            delay(250)
-            callOnce(fallbackUrl, method, params)
-        }
+        val primaryErr = runCatching { callOnce(primaryUrl, method, params) }
+        if (primaryErr.isSuccess) return primaryErr.getOrThrow()
+
+        val fbUrl = fallbackUrl ?: throw primaryErr.exceptionOrNull()!!
+
+        // brief backoff
+        delay(250)
+
+        val fb = runCatching { callOnce(fbUrl, method, params) }
+        if (fb.isSuccess) return fb.getOrThrow()
+
+        throw RpcException(
+            "RPC primary failed: ${primaryErr.exceptionOrNull()!!.message}; " +
+                "fallback failed: ${fb.exceptionOrNull()!!.message}"
+        )
     }
 
     private suspend fun callOnce(url: String, method: String, params: JsonArray): JsonElement {
@@ -58,14 +65,16 @@ class SolanaRpc(
             .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
             .build()
 
-        val (status, headers, text) = withContext(Dispatchers.IO) {
-            val response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+        val (status, headers, bytes) = withContext(Dispatchers.IO) {
+            val response = http.send(request, HttpResponse.BodyHandlers.ofByteArray())
             Triple(
                 response.statusCode(),
                 response.headers().map(),
-                response.body() ?: ""
+                response.body() ?: ByteArray(0)
             )
         }
+
+        val text = runCatching { String(bytes, StandardCharsets.UTF_8) }.getOrElse { "" }
 
         if (status !in 200..299) {
             throw RpcException("RPC HTTP $status; body=${text.take(300)}")
@@ -75,7 +84,9 @@ class SolanaRpc(
             val host = runCatching { URI(url).host }.getOrNull() ?: "(unknown)"
             val clen = headers["content-length"]?.firstOrNull()
             val ctype = headers["content-type"]?.firstOrNull()
-            throw RpcException("RPC empty response body (host=$host, content-type=$ctype, content-length=$clen)")
+            throw RpcException(
+                "RPC empty response body (host=$host, content-type=$ctype, content-length=$clen, bytes=${bytes.size})"
+            )
         }
 
         val resp = runCatching { json.decodeFromString<RpcResponse>(text) }.getOrElse { e ->
